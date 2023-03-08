@@ -1,0 +1,531 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{minted}
+\usepackage{unicode-math}
+
+\newtheorem{question}{Question}
+
+\title{Fondements de l'informatique}
+
+\author{Agrégation d'informatique}
+\date{2023-03-08}
+
+\begin{document}
+
+\maketitle
+
+\paragraph{Préliminaires généraux} Les questions de programmation doivent être traitées en langage OCaml. On pourra utiliser toutes les fonctions des modules \mint{ocaml}{Array} et \mint{ocaml}{List}, ainsi que les fonctions de la bibliothèque standard (celles qui s'écrivent sans nom de module, comme \mint{ocaml}{max}, \mint{ocaml}{incr} ainsi que les opérateurs comme \mint{ocaml}{@}). L'utilisation d'autres modules est interdite. Si les paramètres d'une fonction à coder sont supposés vérifier certaines hypothèses, il ne sera pas utile dans l'écriture de cette fonction de tester si les hypothèses sont bien satisfaites. On ne cherchera pas à gérer les exceptions. Lorsque les choix d'implémentation ne découlent pas directement des spécifications de l'énoncé, il est vivement conseillé de les expliquer.
+
+Il est attendu des candidates et des candidats des réponses construites. Ils seront également évalués sur la précision, le soin et la clarté de la rédaction. Les questions avec une étoile (c'est-à-dire de la forme Question*) sont a priori plus difficiles ou nécessitent plus d'attention. Il est autorisé d'admettre le résultat d'une question (en particulier celles avec une étoile) pour traiter les questions suivantes.
+
+Ce sujet s'intéresse à différents modèles de neurones et réseaux de neurones formels, à leur puissance en tant que modèles de calculs, ainsi qu'à la complexité de leur apprentissage exact.
+
+Fixons une fonction $\mathcal{A}: ℝ → ℝ$ ($ℝ$ désigne l'ensemble des réels). Jusqu'à la fin de la partie \ref{sec:neurones-recurrents-automates-finis}, la fonction $\mathcal{A}$ (qui est appelée la \emph{fonction d'activation}) sera la \emph{fonction de Heaviside}, c'est-à-dire la fonction $\mathcal{H}(x)$ qui vaut $1$ pour $x ≥ 0$, $0$ sinon.
+
+Un \emph{neurone à $n$ entrées} est décrit par des paramètres $w_{1}, w_{2}, \ldots, w_{n}$ et $h$, qui sont des réels. Chacun des $w_{i}$ est appelé un \emph{poids}, et $h$ est appelé le \emph{seuil du neurone}. Un tel neurone calcule une fonction de $ℝ^{n}$ dans $ℝ$ de la façon suivante : sur les entrées $x_{1}, x_{2}, \ldots, x_{n}$, il prend la valeur $\mathcal{A}\left(w_{1} x_{1}+w_{2} x_{2}+\cdots+w_{n} x_{n}-h\right)$. Cette valeur s'appelle sa \emph{valeur d'activation}.
+
+\paragraph{Objectifs généraux du sujet} Dans la partie \ref{sec:neurone-a-seuil}, on étudie les neurones pris isolément. De la même manière qu'en informatique en partant des portes logiques élémentaires comme le $ET$, le $OU$ et la négation $NOT$, on s'intéresse classiquement aux circuits booléens construits à partir de ces portes comme modèles de calculs, on s'intéressera à partir de la partie \ref{sec:reseau-neurones} aux circuits ("réseaux") de neurones construits à partir de neurones.
+
+Notez que les poids et les seuils sont a priori des réels quelconques. On parlera de neurone ou de réseau de neurones à \emph{poids unitaires} lorsque tous les poids\footnote{Dans un réseau à poids unitaire, on n'impose rien sur les seuils : cela peut très bien être des réels quelconques.} prennent leur valeur dans $\{-1,0,1\}$.
+
+\section{\label{sec:neurone-a-seuil}Le cas d'un neurone à seuil}
+
+On note $\mathbf{B}=\{0,1\}$ : l'intuition dans tout le sujet est que le réel $0$ représente la valeur logique \emph{faux}, et que le réel $1$ représente la valeur logique \emph{vraie}. On répète que dans cette partie, comme jusqu'à la fin de la partie \ref{sec:neurones-recurrents-automates-finis}, la fonction d'activation $\mathcal{A}$ est la fonction de Heaviside : on parle de neurone à seuil dans ce cas.
+
+\subsection{Fonction booléennes linéaires à seuil}
+
+On dit qu'une fonction $F: \mathbf{B}^{n} → \mathbf{B}$ est une \emph{fonction booléenne linéaire à seuil} (et plus généralement qu'une fonction $F: S \subseteq ℝ^{n} → \mathrm{B}$ est une \emph{fonction linéaire à seuil}) si elle correspond à la fonction calculée par un neurone à seuil : dit autrement, il existe des réels $w_{1}, \ldots, w_{n}$ et $h$ tels que, pour tout $\mathbf{x}=\left(x_{1}, \ldots x_{n}\right)$ dans $\mathbf{B}^{n}$ (ou plus généralement dans $\left.S\right), F(\mathbf{x})=1$ si et seulement si $\sum_{i=1}^{n} w_{i} x_{i} ≥ h$.
+
+On appelle $\left(w_{1}, \ldots, w_{n}, h\right)$ une \emph{représentation de $F$}. On dit que la représentation est à poids unitaires lorsque $w_{1}, w_{2}, \ldots, w_{n}$ restent dans $\{-1,0,1\}$. Bien entendu, une même fonction booléenne linéaire à seuil peut avoir plusieurs représentations.
+
+Par exemple, la fonction \emph{$ET$ logique} à $n$-arguments $\mathrm{AND}_{n}\left(x_{1}, \ldots, x_{n}\right)$, qui vaut $1$ si et seulement si chacun des $x_{i}$ vaut $1$, est une fonction booléenne linéaire à seuil (et même à poids unitaires). En effet, elle admet la représentation $(\underbrace{1, \ldots, 1}_{n}, n)$, car $\mathrm{AND}_{n}\left(x_{1}, \ldots, x_{n}\right)=1$ si et seulement si $1 x_{1}+1 x_{2}+\cdots+1 x_{n} ≥ n$.
+
+\begin{question}
+	Montrer que le \emph{$OU$ logique} (à $n$-arguments) $\mathrm{OR}_{n}$, la \emph{$NEGATION$ logique} $\mathrm{NOT}_{1}$ (à un argument) sont également des fonctions booléennes linéaires à seuil. Montrer que c'est également le cas de la fonction $\mathrm{MAJORITY}_{n}: \mathbf{B}^{n} → \mathbf{B}$ définie comme la fonction qui vaut $1$ si et seulement si au moins $n / 2$ de ses entrées valent $1$.
+\end{question}
+
+\begin{question}
+	Montrer que le $OU EXCLUSIF$ à deux arguments (noté $\mathrm{XOR}_{2}$ ou encore $\oplus$) n'est pas une fonction booléenne linéaire à seuil.
+\end{question}
+
+\begin{question}
+	En déduire que pour tout $n ≥ 2$, la fonction parité à $n$ arguments $\mathrm{PARITY}_{n}\left(x_{1}, \ldots, x_{n}\right)$ (qui vaut $1$ si et seulement si un nombre pair de ses arguments valent $1$) n'est pas une fonction booléenne linéaire à seuil.
+\end{question}
+
+\subsection{Cas de domaines bornées}
+
+Lorsque $δ$ est un nombre réel strictement positif, une représentation $\left(w_{1}, \ldots, w_{n}, h\right)$ est dite $δ$-séparable sur un ensemble $S \subseteq ℝ^{n}$ si pour tout $x_{1}, \ldots, x_{n} ∈ S$
+\begin{center}
+$\sum\limits_{i=1}^{n} w_{i} x_{i}<h$ si et seulement si $\sum\limits_{i=1}^{n} w_{i} x_{i} ≤ h-δ$.
+\end{center}
+
+Une fonction linéaire à seuil $F$ est dite séparable sur un ensemble $S$ s'il existe $δ>0$ tel que $F$ admette une représentation $δ$-séparable sur $S$.
+
+\begin{question}
+	Montrer que toute fonction linéaire à seuil sur un ensemble fini est séparable.
+\end{question}
+
+La \emph{masse} d'une représentation $\left(w_{1}, \ldots, w_{n}, h\right)$ est définie comme $\max\{|w_{i}| \mid 1 ≤ i ≤ n\}$, c'est-à-dire le maximum des valeurs absolues de ses poids.
+
+\begin{question}
+	\label{q:lambda-delta-separable}
+	Montrer que pour tout $δ>0, S \subseteq ℝ^{n}$, et toute fonction linéaire à seuil $F$, si $F$ possède une représentation qui est $λ$-séparable de masse $w$, alors $F$ possède également une représentation $δ$-séparable de masse $w δ / λ$.
+\end{question}
+
+On en déduit que pour tout $δ>0$, toute fonction linéaire à seuil $F$ séparable possède une représentation $δ$-séparable.
+
+Une fonction $F$ est une fonction linéaire à \emph{seuil nul} si c'est une fonction linéaire à seuil et qu'elle admet une représentation $\left(w_{1}, \ldots, w_{n}, 0\right)$, c'est-à-dire dont le seuil vaut $0$.
+
+\begin{question}
+	Montrer que pour toute fonction linéaire à seuil $F: ℝ^{n} → \mathbf{B}$, on peut construire une fonction linéaire à seuil nul $G: ℝ^{n+1} → \mathrm{B}$ (et donc avec une dimension (entrée) supplémentaire) telle que pour tout $x_{1}, \ldots, x_{n} \in \mathbf{B}, F\left(x_{1}, \ldots, x_{n}\right)=G\left(x_{1}, \ldots, x_{n}, 1\right)$.
+\end{question}
+
+Ne serait-ce que pour des raisons de représentation sur ordinateur, il est parfois intéressant de se ramener au cas où tous les poids sont entiers : on dit qu'une représentation $\left(w_{1}, \ldots, w_{n}, h\right)$ est entière si chacun des $w_{i}$ et $h$ sont des éléments de $ℤ$, l'ensemble des entiers relatifs.
+
+\begin{question}
+	Soit $δ>0$. On considère une fonction linéaire à seuil sur un ensemble borné $S \subseteq[0,1]^{n}$ avec une représentation $n$-séparable, de la forme $\left(w_{1}, \ldots, w_{n}, h\right)$ avec $w_{1}, \ldots, w_{n} ≥ 0$ de masse $n w / δ$. Montrer que la fonction possède également une représentation entière de même dimension de masse au plus $n w / δ$.
+\end{question}
+
+\begin{question}
+	\label{q:seuil-representation}
+	Montrer que toute fonction linéaire à seuil (sans restriction sur le signe des poids) sur un ensemble borné $S \subseteq[0,1]^{n}$ avec une représentation $δ$-séparable de masse $w$, possède une représentation entière de masse au plus $n w / δ$.
+\end{question}
+
+On déduit donc (de la question \ref{q:seuil-representation} et de la remarque qui suit la question \ref{q:lambda-delta-separable} que toute fonction linéaire à seuil séparable sur un ensemble borné possède une représentation entière.
+
+\subsection{Apprentissage d'un neurone à seuil}
+
+Soit $D=[0,1]$ ou $D=[-1,1]$. On considère dans cette partie le problème de l'apprentissage exact des fonctions linéaires à seuil sur le domaine $D$ : c'est-à-dire, étant donné un ensemble fini de $N$ couples, c'est-à-dire $\left(\mathbf{x}_{i}, y_{i}\right)_{1 ≤ i ≤ N}$, avec $\mathbf{x}_{i} \in D^{n}, y_{i} \in \mathbf{B}$, on cherche à déterminer s'il existe une fonction linéaire à seuil $F$ telle que pour tout $1 ≤ i ≤ N, F\left(\mathbf{x}_{i}\right)=y_{i}$. Si une telle fonction $F$ existe, on dit que le problème d'apprentissage admet une solution (qui est la fonction $F$ ). On appelle $n$ la dimension. L'ensemble $X=\left\{x_{1}, x_{2}, \ldots, x_{N}\right\}$ est appelé l'ensemble des exemples. Lorsque $y_{i}=1$ on dit que $\mathbf{x}_{i}$ est un exemple positif. Lorsque $y_{i}=0$ on dit que $\mathbf{x}_{i}$ est un exemple négatif.
+
+On cherche à résoudre ce problème pour $D=[0,1]$ dans le cas le plus général. Pour cela, on va chercher à le réduire à des variantes plus faciles à traiter. On parle de problème d'apprentissage :
+
+\begin{itemize}
+  \item à seuil nul lorsqu'on cherche à déterminer s'il existe $F$. une fonction linéaire à seuil comme ci-dessus, avec de plus $F$ à seuil nul.
+
+  \item à exemples négatifs lorsque l'on a $y_{i}=0$ pour tous les $1 ≤ i ≤ N$.
+
+\end{itemize}
+
+\begin{question}
+	Montrer que le problème de l'apprentissage exact des fonctions linéaires à seuil sur le domaine $D$ en dimension $n$ se réduit au problème de l'apprentissage exact des fonctions linéaires à seuil nul sur le domaine $D$ en dimension $n+1$.
+\end{question}
+
+$\gamma \sim$ \begin{question}
+	Montrer que le problème de l'apprentissage exact des fonctions linéaires à seuil sur le domaine $[0,1]$ en dimension $n$ se réduit au problème de l'apprentissage exact des fonctions linéaires à seuil nul à exemples négatifs sur le domaine $[-1,1]$ en dimension $n+1$.
+\end{question}
+
+Autrement dit, il suffit de savoir résoudre le problime de l'apprentissage exact dans le cas où $F$ est à seuil nul, et où l'on n'a que des exemples négatifs, et $D=[-1,1]$.
+
+On va s'intéresser en fait au problème de calcul associé : étant donné $X$ avec des exemples négatifs, $D=[-1,1]$, lorsqu'il existe une fonction linćaire à seuil nul $F$ solution, produire une représentation d'une telle fonction $F$. Introduisons pour cela l'algorithme suivant.
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-04}
+\end{center}
+
+Chaque itération de la boucle repeat est appelé une époque. Lorsque la condition $\sum_{i=1}^{n} w_{i} x_{i} ≥ 0$ est satisfaite à la ligne 7 , on dit qu'une erreur à été commise.
+
+\begin{question}
+	On fixe la déclaration de type
+\end{question}
+
+type vecteur $=f$ loat array Proposer une implémentation apprentissage: int $→$ vecteur array $→$ vecteur de cet algorithme en $O \mathrm{Caml}$. On rappelle qu'en OCaml, les opérations arithmétiques sur les float sont désignées par.,$+-. *^{*} ., /$.
+
+On veut montrer que l'algorithme termine avec une représentation valide si et seulement si le problème d'apprentissage exact admet une solution à seuil nul.
+
+\begin{question}
+	Montrer que si l'algorithme termine, alors le problème d'apprentissage exact à seuil nul défini par l'ensemble des exemples négatifs $X$ admet une solution, dont une représentation est donnée par $\left(w_{1}, \ldots, w_{n}, 0\right)$.
+\end{question}
+
+Il reste à prouver l'implication réciproque.
+
+$\succ$ \begin{question}
+	Soit $X \subseteq[-1,1]^{n}$ un ensemble fini de $N$ exemples négatifs, et $F$ une fonction linéaire à seuil nul solution. Démontrer que si $F$ possède une représentation $\left(v_{1}, \ldots, v_{n}, 0\right)$ qui est $n$-séparable alors l'algorithme termine et est correct.
+\end{question}
+
+On pourra considérer $d(\mathbf{w}, \mathbf{v})=\sum_{i=1}^{n}\left(w_{i}-v_{i}\right)^{2}$ où $\mathbf{w}=\left(w_{1}, \ldots, w_{n}\right)$ décrit les poids à chaque époque, et on rappelle que $X$ est constitué d'exemples négatifs.
+
+Dans le cas général, on considère $F$ une fonction linéaire à seuil et un ensemble fini d'exemples. Par la question 4 et la partie 2, elle possède une représentation entière.
+
+Question* 14. Soit $X \subseteq[-1,1]^{n}$ un ensemble fini de $N$ exemples négatifs. On suppose que le problème de l'apprentissage exact à exemples négatifs associé à $X$ admet une solution 1-séparable à coefficients entiers et de masse inférieure ou égale à $w$. Montrer que l'algorithme commet alors au plus $\mathcal{O}\left(n^{2} w^{2}\right)$ erreurs et termine en temps au plus $\mathcal{O}\left(n^{2}(n+N) w^{2}\right)$.
+
+\section{\label{sec:reseau-neurones}D'un neurone à seuil à un réseau de neurones}
+On introduit maintenant les circuits de neurones, également appelés "réseaux de neurones".
+
+Fixons un ensemble $K$. Fixons un ensemble $\mathcal{G}$ de portes élémentaires sur $K$ : chaque porte élémentaire $g$ de $\mathcal{G}$ est une fonction $g: K^{n_{g}} → K$ pour un certain entier $n_{g}$, que l'on appelle son arité. Par exemple, on peut prendre $K=\mathrm{B}$, et $\mathcal{G}=\mathcal{G}_{\text {bool }}=\left\{\mathrm{AND}_{2}, \mathrm{OR}_{2}, \mathrm{NOT}_{1}, 0,1\right\}$, où 0 , et 1 sont d'arité 0, et l'arité des autres portes élémentaires est indiquée par l'indice dans son nom.
+
+On définit la notion de circuits sur un ensemble de portes $\mathcal{G}$, en généralisant la notion usuelle de circuit booléen (qui correspond au cas $\mathcal{G}=\mathcal{G}_{\text {bool }}$ sur $K=\mathrm{B}$ ) à un ensemble de portes élémentaires $\mathcal{G}$ plus général.
+
+Définition 1. Un circuit sur $\mathcal{G}$ est donné par un graphe fini $(V \cup X, E)$ orienté sans cycle. Les sommets de $X$ sont appelés des entrées, et n'ont pas d'arc entrant. Tout sommet de $V$ est appelé une porte, et est étiqueté par un élément $g$ de $\mathcal{G}:$ si cet élément $g$ est d'arité $n_{g}$, alors ce sommet possède exactement $n_{g}$ arcs entrants. Les sommets de $V$ qui n'ont pas d'arc sortant sont appelés des sorties. Notons que les sommets de $X$, et de $V$ qui ne sont pas des sorties, peuvent avoir plusieurs arcs sortants. S'il y a $n$ entrées et $m$ sorties, on fixe une numérotation de celles-ci de 1 à $n$ et de 1 à $m$ respectivement.
+
+La taille d'un tel circuit est définie comme le nombre de sommets dans $V$, et donc son nombre de portes.
+
+Étant donnée une valeur pour chacune des entrées, la valeur de chacune des sorties s'obtient en propageant la valeur des entrées vers les sorties en évaluant la valeur de chaque porte selon la fonction associée. On dit que le circuit calcule la fonction $f: S \subseteq K^{n} → K^{m}$, si pour tout $\left(x_{1}, \ldots, x_{n}\right) \in S$, si on note $\left(y_{1}, \ldots, y_{m}\right)=f\left(x_{1}, \ldots, x_{n}\right) \in K^{m}$, alors si l'on fixe l'entrée numéro $i$ à $x_{i}$, pour $1 ≤ i ≤ n$, la valeur de la sortie numéro $j$ est $y_{j}$, pour $1 ≤ j ≤ m$.
+
+Par exemple, un circuit booléen avec $n$ entrées et $m$ sorties calcule une fonction de $\mathbf{B}^{n}$ dans $\mathrm{B}^{m}$.
+
+La fonction profondeur prof qui à un sommet de $V \cup X$ associe sa profondeur se définit inductivement de la façon suivante : $\mathrm{prof}(x)=0$ pour chaque $x \in X$, et $\mathrm{prof}(v)=1+\max _{(s, v) \in E} \mathrm{prof}(s)$. La profondeur d'un circuit est la plus grande profondeur d'un de ses sommets. On appelle couche $k$ l'ensemble des sommets de profondeur $k$.
+
+Voici un circuit booléen sur $\mathcal{G}=\mathcal{G}_{\text {bool }}$ à 3 entrées et 3 sorties, de taille 4 . Si l'on numérote les sorties de gauche à droite, il calcule une certaine fonction $f: \mathrm{B}^{3} → \mathbf{B}^{3}$; on a par exemple $f(0,1,0)=(1,1,0)$.
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-06}
+\end{center}
+
+\begin{question}
+	Quelle est la profondeur de ce circuit? Détailler chacune de ses couches. Décrire complètement la fonction calculée par ce circuit.
+\end{question}
+
+\subsection{Des circuits booléens aux réseaux de neurones à seuil}
+En prenant pour $\mathcal{G}$ l'ensemble des neurones à seuil (un neurone à $n$ entrées ayant l'arité $n$ ) sur $K=ℝ$, on obtient un circuit de neurones, aussi appelé un réseau de neurones.
+
+Cette construction se généralise au cas d'une fonction d'activation $\mathcal{A}$ différente de la fonction de Heaviside : nous reviendrons sur ce point à la fin de la partie \ref{sec:neurones-recurrents-automates-finis}. \begin{question}
+	On souhaite coder les réseaux de neurones en OCaml. Pour la commodité d'implémentation en $O \mathrm{Caml}$, on utilise une représentation différente (bien qu'équivalente) de celle donnée plus haut pour un réseau de neurones. Ce choix de représcntation en machine est fixé uniquement pour cette question et ne sem plus utilisé dans le reste du sujet. On voit un réseau de neurones comme un graphe, où chaque arc est étiqueté par un poids, et chaque sommet est étiqueté par son seuil. On souhaite coder le graphe selon le principe d'une liste d'adjacence : supposons que les sommets sont numérotés de 0 à $n-1$. Le graphe est alors représenté sous la forme d'un tableau $T$ de taille $n$ tel que $T$. (i) contienne la liste des extrémités et poids des arcs sortants du sommet $i$ ainsi que le seuil associé au sommet $i$.
+\end{question}
+
+On définit les types suivants :
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-07}
+\end{center}
+
+Proposer une implémentation en $O C a m l$ de la fonction creer : int $→$ reseau\_adjacence qui permet de créer un réseau avec un nombre donné de sommets.
+
+Même question pour teste\_arc : reseau\_adjacence $→$ sommet $→$ sommet $→$ bool qui permet de tester l'existence d'un arc entre deux sommets.
+
+Même question pour la fonction
+
+ajoute\_arc : reseau\_adjacence $→$ sommet $→$ sommet $→$ poids $→$ reseau\_adjacence qui ajoute un arc entre deux sommets, avec un poids donné.
+
+\begin{question}
+	Soit $C$ un circuit booléen de taille $t$ et de profondeur $d$ qui calcule la fonction $f: \mathbf{B}^{n} → \mathbf{B}^{m}$. Montrer qu'il existe un réseau de neurones à seuil à poids unitaires de taille $t$ et de profondeur $d$ qui calcule la fonction $f$.
+\end{question}
+
+On va voir dans la partie suivante qu'il est parfois possible de calculer certaines fonctions de façon beaucoup plus efficace en terme de taille avec des réseaux de neurones.
+
+On dit qu'un réseau de neurones est bien formé si chaque arc $(u, v)$ de $E$ est tel que si $u$ appartient à la couche $i$, alors $v$ appartient à la couche $i+1$. Par exemple, un réseau qui aurait l'architecture (c'est-à-dire le graphe sous-jacent, les poids et seuils ne sont pas représentés) suivante est bien formé.
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-08(1)}
+\end{center}
+
+\begin{question}
+	Montrer qu'étant donné un réseau $N$ de neurones à seuil, on peut construire un réseau de neurones $N^{\prime}$ à seuil de même profondeur bien formé équivalent : si $N$ possède $n$ entrées, $N^{\prime}$ également, et $N$ et $N^{\prime}$ calculent la même fonction.
+\end{question}
+
+\begin{question}
+	On utilise dans cette question une représentation en machine des réseaux de neurones différente de celle de la question 16 ; ici, on représente un réseau de neurones bien formé par une liste de couples $l$. Si $n$ est le nombre de neurones de la $(i-1)$-ème couche (ou, pour $i=0$, le nombre d'entrées du réseau) et $m$ le nombre de neurones de la $i$-ème couche, le $i$-ème élément de $l$ est composé d'une matrice $W=\left(w_{j k}\right)$ de nombres flottants à $n$ lignes et $m$ colonnes et d'un vecteur $H=\left(h_{k}\right)$ de nombres flottants de taille $m$. Si la valeur du neurone $j$ de la couche $i-1$ (ou, pour $i=0$, l'entrée $j$ du réseau) est une entrée du neurone $k$ de la couche $i$, $w_{j k}$ est la valeur du poids correspondant; $w_{j k}$ vaut 0 sinon. Enfin, le nombre $h_{k}$ est la valeur du seuil associé au neurone $k$ de la couche $i$.
+\end{question}
+
+Ainsi, si l'exemple suivant représente deux couches consécutives (les nombres indiqués à côté des sommets étant les seuils associés, ceux à côté des arêtes les poids associés), la matrice associée à la seconde couche sera alors $\left(\begin{array}{cc}0 & 2 \\ -1 & 1 \\ 0 & 3\end{array}\right)$ et le vecteur $\left(\begin{array}{c}-1 \\ 1\end{array}\right)$.
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-08}
+\end{center}
+
+On introduit les types suivants :
+
+type vecteur $=$ float array
+type matrice $=$ float array array
+type reseau\_matrice $=$ (matrice * vecteur) list
+
+Proposer le code $O C a m l$ d'une fonction eval: reseau\_matrice $→$ vecteur $→$ vecteur qui renvoie le résultat de l'évaluation d'un tel réseau de neurones sur un vecteur donné (ledit vecteur décrivant la valeur des entrées du réseau de neurones).
+
+\subsection{À propos des circuits booléens}
+Dans les circuits booléens tels que définis plus haut, on a considéré que $\mathcal{G}$, l'ensemble des portes élémentaires était $\mathcal{G}=\left\{\mathrm{AND}_{2}, \mathrm{OR}_{2}, \mathrm{NOT}_{1}, 0,1\right\}$. On parlera de circuits booléen généralisé si l'on s'autorise $\mathcal{G}=\left\{\mathrm{AND}_{n}, \mathrm{OR}_{n}, \mathrm{NOT}_{1}, 0,1 \mid n \in \mathbb{N}\right\}$ : autrement dit, les portes ET logique et $O U$ logique peuvent avoir plus que deux arguments. On appellera porte AND généralisée (respectivement : porte OR généralisée) une telle porte $\mathrm{AND}_{n}$ (respectivement : $\mathrm{OR}_{n}$ ) pour un certain entier $n$.
+
+Une formule en forme normale conjonctive (autrement dit sous la forme d'une conjonction de disjonctions de littéraux, un littéral étant une variable ou sa négation) peut s'écrire comme un circuit $N O T-O R-A N D:$ c'est-à-dire, comme un circuit généralisé avec :
+
+\begin{itemize}
+  \item une unique sortie, étiquetée par une porte AND généralisée ;
+
+  \item les entrées, ou les portes 0 et 1, qui ont leur(s) $\mathrm{arc(s)}$ sortant(s) qui vont soit vers une porte $\mathrm{NOT}_{1}$, soit vers l'une des portes OR généralisées;
+
+  \item les portes $\mathrm{NOT}_{1}$ qui ont leur(s) arc(s) sortant(s) qui va vers une porte OR généralisée;
+
+  \item les portes OR généralisées ont leur arc sortant qui va vers la porte AND généralisée.
+
+\end{itemize}
+
+Symétriquement pour une formule en forme normale disjonctive qui peut s'écrire comme un circuit $N O T-A N D-O R$, défini en inversant le rôle des OR et AND dans la description précédente.
+
+On appellera circuit 2-alternant un circuit qui est soit $N O T-O R-A N D$, soit $N O T-$ $A N D-O R$. On souhaite prouver que tout circuit 2-alternant qui calcule la fonction PARITY a une taille au moins $2^{n-1}+1$.
+
+\begin{question}
+	Montrer que dans tout circuit $N O T-A N D-O R$ qui calcule la fonction PARITY, pour chaque entrée $b=\left(b_{1}, \ldots, b_{n}\right) \in \mathbf{B}^{n}$ avec PARITY $\left(b_{1}, \ldots, b_{n}\right)=1$, il y au moins une porte AND généralisée, que l'on appellera $A_{b}$, dont la valeur de sortie sur l'entrée $\left(b_{1}, \ldots, b_{n}\right)$ est 1 .
+\end{question}
+
+Question* 21. Montrer que dans la question précédente, on peut supposer de plus qu'il existe dans le circuit un chemin de chacune des $n$ entrées vers cette porte $A_{b}$. ४ \begin{question}
+	Montrer que tout circuit $N O T-A N D-O R$ qui calcule la fonction PARITY a une taille au moins $2^{n-1}+1$. En déduire que tout circuit 2-alternant qui calcule la fonction PARITY a we taille au moins $2^{n-1}+1$.
+\end{question}
+
+\subsection{À propos des réseaux de neurones à seuil à poids unitaires}
+Une fonction $f: \mathrm{B}^{n} → \mathrm{B}^{m}$ est dite symétrique si sa valeur ne dépend pas de l'ordre de ses arguments.
+
+\begin{question}
+	Soit $m ≤ n$ des entiers. Proposer un neurone à seuil à poids unitaires qui renvoie 1 sur les entrées $x_{1}, \ldots, x_{n} \in \mathbf{B}$ si et seulement si au moins $m$ de ces entrées ont la valeur 1. Proposer par ailleurs un neurone à seuil à poids unitaires qui renvoie 1 sur les entrées $x_{1}, \ldots, x_{n} \in \mathrm{B}$ si et seulement si au plus $m$ de ces entrées ont la valeur 1.
+\end{question}
+
+$\curlyvee$ \begin{question}
+	Montrer que toute fonction symétrique $f: \mathbf{B}^{n} → \mathbf{B}$ peut être calculée par un réseau de neurones à seuil à poids unitaires de taille $\mathcal{O}(n)$ et profondeur 2.
+\end{question}
+
+\begin{question}
+	En déduire que l'on peut calculer la fonction PARITY avec une profondeur 2 et une taille $\mathcal{O}(n)$
+\end{question}
+
+Rappelons que l'on a prouvé qu'on ne pouvait pas la calculer en profondeur 1. C'est donc un exemple de fonction qui ne se calcule pas avec une couche, mais peut se calculer avec deux, et se calcule avec beaucoup moins de portes en utilisant des réseaux de neurones qu'avec des circuits booléens.
+
+\section{Complexité de l'apprentissage d'un circuit}
+
+Nous étudions dans cette partie la complexité de déterminer les poids d'un réseau de neurones dont l'architecture est fixée.
+
+Appelons architecture un graphe comme dans la définition 1 (c'est-à-dire un circuit sans les étiquettes des sommets de $V$ ), avec $n$ entrées et $m$ sorties. Une tâche est alors un élément de $\mathrm{B}^{n} \times \mathrm{B}^{m}$.
+
+Définition 2. On dit que l'architecture est compatible avec la tâche $\left(x_{1}, \ldots, x_{n}, y_{1}, \ldots, y_{m}\right)$ s'il existe des valeurs des poids dans $\{-1,0,1\}$ et des valeurs entières des seuils pour les portes du graphe telles qu'on obtient la sortie $\left(y_{1}, \ldots, y_{m}\right)$ quand on évalue le réseau de neurones correspondant sur l'entrée $\left(x_{1}, \ldots, x_{n}\right)$.
+
+On s'intéresse au problème de décision Apprentissage exact : étant donnée une architecture et une liste finie de tâches, déterminer si l'architecture est compatible avec toutes les tâches de la liste au sens de la définition 2 (c'est-à-dire avec des poids unitaires et des seuils entiers).
+
+\begin{question}
+	Montrer que le problème est dans la classe NP. On va chercher à prouver que le problème est. NP-complet, en utilisant la NP-complétude de 3-SAT, que l'on admettra. On rappelle qu'il s'agit de déterminer la satisfiabilité d'une formule en forme normale conjonctive, avec 3 littéraux par clause (on rappelle qu'une clause est une disjonction de littéraux).
+\end{question}
+
+\begin{question}
+	On considère l'architecture à 4 entrées (à savoir $x_{1}, x_{2}, x_{3}, c$ ) et 1 sortie (à savoir $y$ ) représentée graphiquement ci-dessous.
+\end{question}
+
+On considère les 8 tâches que l'on obtient en faisant varier $x_{1}, x_{2}, x_{3} \in \mathbf{B}$, et en ayant fixé $e=0$, en prenant $y$ qui vaut 1 sauf dans l'unique cas $x_{1}=1, x_{2}=0, x_{3}=1$ où $y$ vaut 0 .
+
+Prouver que l'architecture ci-dessous est compatible avec ces 8 tâches.
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-11}
+\end{center}
+
+\begin{question}
+	On suppose qu'on a fixé les seuils et poids de l'architecture de la question précédente de manière à obtenir un réseau de neurones qui, sur les 8 tâches de cette dernière question, produit les sorties attendues. Notons $f_{i}(x)$ la valeur d'activation du nœud $v_{i}$ sur l'entrée $(x, 0)$. Montrer que $f_{i}$ est soit la fonction identité, soit la fonction $x \mapsto \mathrm{NOT}(x)$.
+\end{question}
+
+\begin{question}
+	On suppose toujours donné un réseau de neurones comme à la question précédente. Montrer que la valeur d'activation de $c$, notée $y$, s'exprime sous la forme $y=\mathrm{NOT}\left(x_{1}\right) \vee x_{2} \vee$ $\mathrm{NOT}\left(x_{3}\right)$, où l'entrée $x_{i}=f_{i}^{-1}\left(a_{i}\right)$ est soit $a_{i}$, soit $\mathrm{NOT}\left(a_{i}\right)$.
+\end{question}
+
+Nous avons donc montré que tout réseau construit par apprentissage exact à partir de l'architecture et des tâches données à la question 27 calcule la fonction $\mathrm{NOT}\left(x_{1}\right) \vee x_{2} \vee \mathrm{NOT}\left(x_{3}\right)$.
+
+Plaçons-nous maintenant dans le contexte où l'architecture et les tâches de la fonction 27 sont un sous-graphe et des sous-tâches d'une architecture $\mathcal{A}$ plus grande. Si l'on ajoute aux 8 tâches initiales une tâche de la forme $\left(x_{1}, x_{2}, x_{3}, y, e\right)=\left(\alpha_{1}, \alpha_{2}, \alpha_{3}, 1,1\right)$ où $\alpha_{1}, \alpha_{2}, \alpha_{3}$ sont arbitraires, on déduit des questions précédentes que si l'architecture $\mathcal{A}$ est compatible avec cet ensemble de tâches, il existe des valeurs de $x_{1}, x_{2}, x_{3}$ telles que la clause $\mathrm{NOT}\left(x_{1}\right) \vee x_{2} \vee \mathrm{NOT}\left(x_{3}\right)$ est satisfaite.
+
+$<$ Question* 30. Déduire de ce qui précède que le problème de l'apprentissage exact des réseaux de neurones de profondeur 2 est NP-complet.
+
+\section{\label{sec:neurones-recurrents-automates-finis}Réseaux de neurones récurrents et automates finis}
+On considère maintenant des réseaux de neurones récurrents, c'est-à-dire où l'organisation en couche est cyclique. On obtient un tel réseau de la façon suivante : on part d'un réseau de neurones $R$ bien formé avec $p+n$ entrées, et $n$ sorties, pour deux entiers $n$ et $p$ : ses entrées sont numérotées de 1 à $n+p$ et ses sorties de 1 à $n$. On identifie les $n$ sorties avec les $n$ dernières entrées : c'est-à-dire que chaque arc sortant de l'entrée numéro $p+i$ vers un certain sommet $s$ devient un arc sortant de la sortie numéro $i$ vers le sommet $s$. Il reste $p$ entrées que l'on considère comme les $p$ entrées du réseau récurrent.
+
+Dans un réseau récurrent, les valeurs d'activations des neurones évoluent au cours du temps : à chaque pas de temps, le résultat des $n$ sorties au temps $t$ sont réinjectées comme entrées à l'étape $t+1$.
+
+Par exemple, en partant du réseau $R$ représenté en haut de la page 23 , en considérant $p=2$ et $n=2$, on obtient l'architecture suivante (les différents types des arêtes, ordinaire, épais, et pointillés, sont là pour améliorer la lisibilité du graphe et n'ont pas de sémantique particulière).
+
+\begin{center}
+\includegraphics{2023_03_08_205c20c90eb05fc7e35cg-12}
+\end{center}
+
+Si le graphe de $R$ était le graphe acyclique $(V \cup X, E)$ (voir la définition 1), alors le graphe obtenu s'écrit $\left(V \cup X^{\prime}, E^{\prime}\right)$ avec $X^{\prime}$ constitué de $p$ sommets, qui correspondent aux entrées restantes. On peut supposer que $V$ s'écrit $V=\{1,2, \ldots, m\}$ où $m$ est le nombre de sommets de $V$. A un instant $t$ on décrit les valeurs d'activation de chacun des neurones de $V$ par le vecteur $\mathbf{z}(t)=\left(z_{1}(t), z_{2}(t), \ldots, z_{m}(t)\right)$. Initialement, $z_{i}(0)=0$ pour tout $1 ≤ i ≤ m$. A chaque instant $1 ≤ t$, on note $x_{1}(t), x_{2}(t), \ldots, x_{p}(t)$ la valeur des entrées au temps $t$. La valeur de $z_{j}(t+1)$ est alors obtenue comme
+
+$$
+z_{j}(t+1)=\mathcal{A}\left(\sum_{1 ≤ i ≤ p:(i, j) \in E^{\prime}} w_{i, j} x_{i}(t)+\sum_{i^{\prime} \in V:\left(i^{\prime}, j\right) \in E^{\prime}} w_{i^{\prime}, j} z_{i^{\prime}}(t)-h_{j}\right),
+$$
+
+où $w_{i, j}$ désigne le poids correspondant à l'arc de l'entrée $x_{i}$ vers le sommet $j$, et $w_{i^{\prime}, j}$ désigne le poids de l'arc du sommet $i^{\prime}$ de $V$ vers le sommet $j$, et $h_{j}$ le seuil du sommet $j$. Cela correspond à propager les valeurs selon la dynamique de chacun des neurones de façon synchrone (c'est-à-dire tous en même temps).
+
+On va chercher à caractériser ce que l'on peut calculer avec de tels réseaux.
+
+\section{Réseaux de neurones à seuil et reconnaissance immédiate}
+On rappelle qu'un automate fini (déterministe) est la donnée de $\left(Q, Σ, q_{0}, A, δ\right): Q$ est l'ensemble fini de ses états, $Σ$ est son alphabet fini d'entrée, $q_{0} \in Q$ est son état initial, $A \subseteq Q$ est son ensemble des états acceptants, et $δ: Q \times Σ → Q$ est sa fonction de transition. On suppose que $Σ=\mathbf{B}=\{0,1\}$ est l'alphabet de tous les mots et langages mentionnés dans la suite.
+
+À l'automate fini $M$ et un $\mathrm{mot} \omega=a_{1} \ldots a_{\ell}$, avec chaque $a_{i} \in Σ$, on associe la suite d'états définie par $q(0)=q_{0}$, et $q(t+1)=δ\left(q(t), a_{t}\right)$. Le mot $\omega$ est accepté si $q(\ell) \in A$. Le langage $L(\mathcal{M}) \subseteq Σ^{*}$ accepté par $\mathcal{M}$ est l'ensemble des mots acceptés. Un langage est régulier s'il est accepté par un automate fini.
+
+On admettra que l'on pourrait considérer qu'il n'y a qu'un seul état acceptant (autrement dit formellement supposer que $A$ est un singleton), et qu'il n'est pas possible de faire une transition vers l'état initial $q_{0}$ (autrement dit, $δ(r, s) \neq q_{0}$ pour tout $\left.r \in Q, s \in Σ\right)$ : cela ne change rien à la classe des langages acceptés. On note $q$ le nombre d'éléments de $Q$.
+
+On peut considérer que $Q$, l'ensemble des états, est donné comme $\left\{\mathbf{e}_{1}, \ldots, \mathbf{e}_{q}\right\} \subseteq \mathbf{B}^{q}$, où le vecteur $\mathbf{e}_{i}$ est le vecteur de $\mathbf{B}^{q}$ dont toutes les coordonnées sont nulles, sauf la $i$-ème qui vaut 1 .
+
+\begin{question}
+	Montrer que l'on peut construire un réseau de neurones ${ }^{2}$ à seuil à poids unitaires, avec $q+1$ entrées et $q$ sorties, qui calcule cette fonction.
+\end{question}
+
+Introduisons un encodage alternatif qui rend possible la construction d'un réseau de neurone de profondeur 1 : on utilise $2 q$ variables $x_{i, e}$ pour $1 ≤ i ≤ q$, et $e \in \mathbf{B}$. Chaque variable $x_{i, e}$ prend ses valeurs dans $\mathbf{B}$, et vaut 1 si et seulement si l'état de l'automate est $q_{i}$ et le dernier symbole lu est le symbole $e$. A tout instant $t ≥ 1$, exactement une de ces variables vaut 1 , et toutes les autres valent 0 . La fonction $δ: Q \times \mathbf{B} → Q$ peut alors se voir comme une fonction ${ }^{3} \mathbf{B}^{2 q+1}$ dans $\mathbf{B}^{2 q}$ qui met à jour ces variables.
+
+\begin{enumerate}
+  \setcounter{enumi}{1}
+  \item Non-récurrent.
+
+  \item fonction partielle, au sens où elle n'est potentiellement définie que sur un sous-ensemble de $\mathbf{B}^{2 q+1}$. \begin{question}
+	Montrer que l'on peut construire un réseau de neurones ${ }^{4}$ à seuil, de profondeur 1 , à poids unitaires, avec $2 q+1$ entrées et. $2 q$ sorties, qui calcule cette fonction.
+\end{question}
+
+\end{enumerate}
+
+On veut considérer un réseau de neurones récurrent comme reconnaissant un langage : on considère qu'un des neurones est. le ncuronc de décision. On suppose $p=1$ (une unique entrée). On note $\omega=x_{1}(1) \cdot x_{1}(2) \cdot \ldots \cdot x_{1}(\ell)$ le mot de taille $\ell$ sur l'alphabet $Σ$ obtenu en concaténant la valeur de l'entrće $x_{1}(t)$ aux temps $t=1, \ldots, \ell$. On dit que le mot $\omega$ est accepté si au temps $\ell$, le neurone de décision a sa valeur d'activation à 1 , rejeté sinon.
+
+« \begin{question}
+	Prouver que si un langage est régulier, alors il correspond à l'ensemble des mots acceptés par un réseau de neurones récurrent à seuil.
+\end{question}
+
+\begin{question}
+	Prouver la réciproque : tout langage accepté par un réseau de neurones récurrent à seuil est régulier.
+\end{question}
+
+\section{Réseaux de neurones à seuil et reconnaissance hors ligne}
+Dans un automate fini, la décision d'accepter (ou de rejeter) est prise immédiatement à la fin de la lecture du mot. On considère un modèle d'automate fini hors-ligne, c'est-à-dire que le calcul dans l'automate peut continuer après la fin de la lecture du mot reçu en entrée ; la décision d'acceptation ou de rejet intervient alors à la fin du calcul.
+
+Formellement, un automate fini hors-ligne est la donnée de $\left(Q, Σ, q_{0}, A, δ\right)$ définis exactement comme pour un automate fini, si ce n'est que sa fonction de transition $f$ n'envoie pas $Q \times Σ$ sur $Q$, mais $Q \times(Σ \bigcup\{\$\})$ sur $Q$, où $\$$ est un symbole spécial $(\$ \notin Σ)$ qui encode le fait que le mot en entrée a été complètement lu par la machine. Ici encore, on suppose toujours que $Σ=B$.
+
+À l'automate fini hors-ligne $M$ et un $\mathrm{mot} \omega=a_{1} \ldots a_{\ell}$, avec chaque $a_{i} \in Σ$, on associe la suite d'états définie par $q(0)=q_{0}$, et $q(t+1)=δ\left(q(t), a_{t}\right)$ pour $t=1,2, \ldots \ell$, puis $q(t+1)=δ(q(t), \$)$ pour $t ≥ \ell$. Le mot $\omega$ est accepté s'il existe $t ≥ \ell$ tel que $q(t) \in A$.
+
+\begin{question}
+	Montrer qu'un langage est régulier si et seulement s'il est accepté par un automate fini hors-ligne.
+\end{question}
+
+On veut considérer un réseau de neurones récurrent comme reconnaissant un langage hors ligne : on considère $p=2$ : le réseau récurrent possède deux entrées, l'une appelée $D$, disons $x_{1}$, qui sert à entrer les données, et l'autre $V$, disons $x_{2}$, qui sert à indiquer quand l'entrée est valide (ou si l'on préfère, de façon duale, à dire quand on a terminé de donner l'entrée). Jusqu'à un certain temps $\ell, V$ vaut 1 , puis ensuite $V$ est maintenu à 0 . La valeur de l'entrée $D$ au temps $t=1,2, \ldots, \ell$, peut se voir comme un $\mathrm{mot} \omega$ de longueur $\ell$ sur l'alphabet $Σ=\mathbf{B}$.
+
+On considère qu'un des neurones est le neurone de décision $G$, et qu'un autre neurone est le neurone de validation $H$. On dit que le réseau calcule tant que $H$ est à 0 .
+
+\begin{enumerate}
+  \setcounter{enumi}{3}
+  \item Non-récurrent. Soit $\omega \in Σ^{*}$. On définit le temps d'arrêt $T_{\omega}$ comme le plus petit entier (éventuellement infini) $t$ tel que $H(t)=1$, sur l'entrée $\omega$. Le mot $\omega$ est accepté si $T_{\omega}$ est fini et $G\left(T_{\omega}\right)$ vaut 1.
+\end{enumerate}
+
+Ә \begin{question}
+	Prouver que si un langage est régulier alors il correspond à l'ensemble des mots acceptés par un réseau de neurones récurrent à seuil hors ligne.
+\end{question}
+
+La réciproque cst vrnic: tout langage accepté par un réscau de neurones récurtent à seuil hors ligne est rigulicr. C'est esscnticllement le meme misonnement que dans la question 34.
+
+\section{Réseaux de neurones linéaires saturés à coefficients entiers}
+On s'intéresse dans cette question, et dans les parties suivantes à des circuits de neurones (réseaux de neurones) pour lesquels la fonction d'activation $\mathcal{A}$ n'est pas nécessairement la fonction de Heaviside. Étant donnée une certaine fonction $\mathcal{A}$ sur $K$, on considère les circuits que l'on obtient en prenant pour $\mathcal{G}$ l'ensemble des neurones (un neurone à $n$ entrées ayant l'arité $n$ ) construits à partir de cette fonction d'activation $\mathcal{A}$.
+
+En particulier, on appelle sigmoide idéale la fonction continue $\sigma(x)$ qui vaut $x$ pour $x \in[0,1]$, 0 pour $x ≤ 0$, et 1 pour $x ≥ 1$. On parle de neurone linéaire saturé pour un neurone construit en prenant cette fonction $\sigma$ comme fonction $\mathcal{A}$ sur $K=ℝ$. On parle de réseaux de neurones linéaires saturés lorsque tous les neurones du réseau le sont.
+
+\begin{question}
+	Soit $L$ un langage sur l'alphabet $\mathbf{B}=\{0,1\}$. Prouver que les assertions suivantes sont équivalentes :
+\end{question}
+
+\begin{enumerate}
+  \item Le langage $L$ est régulier.
+
+  \item Le langage $L$ est accepté par un réseau de neurones linéaire saturé dont les poids et seuils sont entiers.
+
+  \item Le langage $L$ est accepté hors ligne par un réseau de neurones linéaire saturé dont les poids et seuils sont entiers.
+
+\end{enumerate}
+
+\section{Partie V. Réseaux de neurones récurrents ReLU}
+Dans cette section, on considère cette fois des réseaux de neurones où la fonction $\mathcal{A}$ est la fonction ReLU (pour Rectified Linear Unit en anglais, soit Unité Linéaire Rectifié en français), c'est-à-dire la fonction continue $\mathcal{R}(x)=\max (x, 0)$ qui vaut $x$ pour $x ≥ 0$, et 0 pour $x ≤ 0$. On parle de neurone ReLU pour un neurone construit en prenant cette fonction $\mathcal{R}$ comme fonction $\mathcal{A}$ sur $K=ℝ$, et on parle de réseau de neurones ReLU lorsque tous les neurones du réseau le sont.
+
+Une machine à compteurs possède un compteur d'instruction $R$ et un nombre fini $k$ de compteurs $r_{1}, r_{2}, \cdots, r_{k}$, qui prennent leurs valeurs dans l'ensemble $\mathbb{N}$ des entiers naturels. L'état de la machine à un instant donné est donné par la valeur du $k+1$-uplet d'entiers $\left(R, r_{1}, \ldots, r_{k}\right) \in$ $\mathbb{N}^{k}$ Un programme d'une telle machine est constitué d'une liste finic $I_{1}, I_{2}, \ldots, I_{q}$ d'instructions. Chaque instruction est de l'un des trois types suivants :
+
+\begin{itemize}
+  \item Inc(c, $j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ j ≤ q:$ si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(j, r_{1}, \ldots, r_{c-1}, r_{c}+1, r_{c+1}, \ldots, r_{k}\right)$. Autrement dit, on incrémente le compteur $c$ et on va à l'instruction $j$.
+
+  \item $\mathrm{Decr}(c, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ j ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(j, r_{1}, \ldots, r_{c-1}, \max \left(0, r_{c}-1\right), r_{c+1}, \ldots, r_{k}\right)$. Autrement dit, on décrémente le compteur $c$ s'il était strictement positif, on le laisse inchangé sinon, et on va à l'instruction $j$.
+
+  \item IsZero $(c, i, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ i ≤ q, 0 ≤ j ≤ q:$ si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(i, r_{1}, \ldots, r_{k}\right)$ si $r_{c}=0$ et $\left(j, r_{1}, \ldots, r_{k}\right)$ sinon. Autrement dit, on teste si le compteur $c$ vaut 0 , et on va à l'instruction $i$ si c'est le cas, à l'instruction $j$ sinon.
+
+\end{itemize}
+
+On fixe une valeur initiale pour les compteurs $r_{1}, \ldots, r_{k}$. Le compteur d'instruction $R$ vaut initialement 1. On convient que lorsque $R=0$, la machine s'arrête. À chaque instant $t$, tant que $R \neq 0$, on regarde la valeur du compteur d'instruction $R$. On exécute alors l'instruction $I_{R}$ correspondante, qui met à jour $R$, et les valeurs des compteurs $r_{1}, \ldots, r_{k}$ selon les règles plus haut pour cette instruction $I_{R}$.
+
+\begin{question}
+	Décrire un programme d'une machine à deux compteurs qui multiplie par 2, c'està-dire qui, sur l'entrée $(1, n, 0)$ arrive, après un certain nombre d'étapes, dans l'état $(0,2 n, 0)$.
+\end{question}
+
+\begin{question}
+	Montrer que l'on peut construire un neurone ReLU (c'est-à-dire dont la fonction d'activation est la fonction ReLU) avec une entrée et une sortie, et qui calcule la fonction qui à $r \in ℝ$ associe $r+1$. Même question pour la fonction qui à $r \in ℝ$ associe $\max (0, r-1)$. Même question pour la fonction qui à $r \in ℝ$ associe 1 si $r=0$ et 0 sinon.
+\end{question}
+
+\begin{question}
+	On fixe trois entiers $c, u, v$ et $l$. Décrire un programme d'une machine à compteurs (avec $k$ suffisamment grand) tel que, lorsque la machine démarre dans l'état initial $\left(1, r_{1}, \ldots, r_{k}\right)$, elle se retrouve après un certain temps dans l'état $\left(l, r_{1}, \ldots, r_{c-1}, r_{u}+r_{v}, r_{c+1}, \ldots, r_{k}\right)$.
+\end{question}
+
+En utilisant un tel programme, on peut par conséquent considérer que le jeu d'instruction n'est pas limité aux trois types d'instructions plus haut, mais peut également être une instruction du type $\mathrm{Add}(c, u, v, l)$, pour certains $1 ≤ c ≤ k, 1 ≤ u ≤ k, 1 ≤ v ≤ k, 0 ≤ l ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(l, r_{1}, \ldots, r_{c-1}, r_{u}+r_{v}, r_{c+1}, \ldots, r_{k}\right)$.
+
+De même on peut autoriser une instruction du type $\mathrm{Sub}(c, u, v, l)$, pour certains $1 ≤ c ≤ k$, $1 ≤ u ≤ k, 1 ≤ v ≤ k, 0 ≤ l ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(l, r_{1}, \ldots, r_{c-1}, \max \left(0, r_{u}-r_{v}\right), r_{c+1}, \ldots, r_{k}\right)$.
+
+\begin{question}
+	On considère un neurone ReLU unitaire : pour certains poids $w_{1}, w_{2}, \ldots, w_{n}$ dans $\{-1,0,1\}$, et un seuil $h$ entier, il calcule la fonction qui aux entiers naturels $x_{1}, \ldots, x_{n}$ associe $\mathcal{R}\left(w_{1} x_{1}+w_{2} x_{2}+\cdots+w_{n} x_{n}-h\right)$.
+\end{question}
+
+Décrire un programme d'une machine à compteurs qui calcule cette fonction. On peut par conséquent se convaincre que pour tout réseau de neurones récurtent ReLU à poids unitaires, on peut construire une machine à compteur qui le simule.
+
+\begin{question}
+	Prouver la réciproque : montrer que pour tout programme de machine à compteurs, on peut construire un réseau ReLU à poids unitaires qui le simule. On précisera en particulier comment est codé le compteur d'instruction, et sa mise à jour. On s'autorisera à ce que la simulation ne soit pas en temps réel : $t$ instructions sont simulées par $t^{\prime}>t$ étapes (c'est-à-dire $t^{\prime}>t$ propagations des valeurs selon la dynamique) du réseau : on précisera la relation entre $t$ et $t^{\prime}$ dans la simulation proposće.
+\end{question}
+
+Autrement dit, sur les entrées entières, les réscaux de neurones récurrents ReLU à poids unitaires et seuils entiers ont la même puissance que les machines à compteurs. On admettra que cela correspond également à celle des machines de Turing.
+
+\section{Partie VI. Réseaux de neurones récurrents linéaires saturés}
+Dans cette section, on considère à nouveau des réseaux de neurones où la fonction $\mathcal{A}$ est la fonction sigmoïde idéale, c'est-à-dire la fonction continue $\sigma(x)$ qui vaut $x$ pour $x \in[0,1], 0$ pour $x ≤ 0$, et 1 pour $x ≥ 1$. On rappelle que l'on parle de neurones ou de réseaux de neurones linéaires saturés dans ce cas.
+
+\begin{question}
+	Montrer que toute fonction calculée par un réseau de neurones linéaire saturé se calcule par un réseau de neurones ReLU (de taille et profondeur plus grande).
+\end{question}
+
+La réciproque est fausse car la fonction $\mathcal{R}$ peut prendre des valeurs en dehors de $[0,1]$ que l'on ne peut pas générer avec la fonction $\sigma$. Les résultats précédents donnent un moyen de simuler une machine de Turing (un calcul arbitraire) par un réseau ReLU, mais on utilise des neurones dont la valeur d'activation peut devenir arbitrairement grande. Par ailleurs, la simulation de $t$ étapes d'une machine de Turing se fait en pratique avec un nombre non polynomial en $t$ de mise à jour du réseau de neurones. On va prouver que l'on peut rester sur un domaine borné, en l'occurrence $[0,1]$, en utilisant les réseaux de neurones linéaires saturés, et par ailleurs de façon beaucoup plus efficace en temps.
+
+On appelle pile une variable $r$ qui prend ses valeurs dans l'ensemble $\mathbf{B}^{*}$ des mots sur l'alphabet B. Autrement dit, à un instant donné, $r$ s'écrit $r=w_{1} w_{2} \ldots w_{n}$ avec chacun des $w_{i} \in \mathbf{B}$. On note $p u s h_{0}: \mathbf{B}^{*} → \mathbf{B}^{*}$ la fonction qui envoie $r$ sur le mot $0 r$, soit le mot qui s'écrit $0 w_{1} w_{2} \ldots w_{n}$. On note $p u s h_{1}: \mathbf{B}^{*} → \mathrm{B}^{*}$ la fonction qui envoie $r$ sur le mot $1 r$, soit le mot qui s'écrit $1 w_{1} w_{2} \ldots w_{n}$. On note pop : $\mathrm{B}^{*} → \mathrm{B}^{*}$ la fonction qui envoie $r$ sur le mot obtenu en enlevant sa première lettre soit $w_{2} \ldots w_{n}$, ou le mot vide si $r$ était le mot vide. On note top : $\mathbf{B}^{*} → \mathbf{B}$ la fonction qui envoie $r$ sur sa première lettre $w_{1}$ (ou sur 0 si $r$ était le mot vide).
+
+\begin{question}
+	On code chaque mot $r=w_{1} \ldots w_{n}$ sur l'alphabet $Σ=\mathbf{B}$ par le rationnel de $[0,1]$ défini par $\gamma(r)=\sum_{i=1}^{n} \frac{2 w_{i}+1}{4^{i}}$.
+\end{question}
+
+Montrer qu'on peut construire un neurone linéaire saturé qui simule l'effet de top sur une pile : si on lui donne en entrée $\gamma(r)$, alors sa sortie (valeur d'activation) correspond à top $(r)$. Montrer qu'on peut construire un neurone linéaire saturé qui simule l'effet de $p u s h_{0}$ sur une pile : si on lui donne en entrée $\gamma(r)$, alors sa sortie correspond a $\gamma\left(p u s h_{0}(r)\right)$. Même question pour push it pop.
+
+Une machine d̀ piles possede un compteur d'instruction $R$ et un nombre fini $k$ de piles $r_{1}, r_{2}, \cdots, r_{k}$. L'état de la machine à un instant donné est donné par la valeur du $k+1$-uplet d'entiers $\left(R, r_{1}, \ldots, r_{k}\right) \in \mathbb{N} \times\left(\mathbf{B}^{*}\right)^{k}$.
+
+Un programme d'une telle machine est constitué d'une liste finie $I_{1}, I_{2}, \ldots, I_{\eta}$ d'instructions. Chaque instruction est de l'un des quat re types suivants :
+
+\begin{itemize}
+  \item $\mathrm{Push}_{0}(c, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ j ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(j, r_{1}, \ldots, r_{c-1}, p u s h_{0}\left(r_{c}\right), r_{c+1}, \ldots, r_{k}\right)$.
+
+  \item $\mathrm{Push}_{1}(c, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ j ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(j, r_{1}, \ldots, r_{c-1}, p u s h_{1}\left(r_{c}\right), r_{c+1}, \ldots, r_{k}\right)$.
+
+  \item $\mathrm{Pop}(c, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ j ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(j, r_{1}, \ldots, r_{c-1}, \mathrm{pop}\left(r_{c}\right), r_{c+1}, \ldots, r_{k}\right)$.
+
+  \item $\mathrm{Top}(c, i, j)$, pour un certain $1 ≤ c ≤ k$ et $0 ≤ i ≤ q, 0 ≤ j ≤ q$ : si l'état de la machine est $\left(R, r_{1}, \ldots, r_{k}\right)$, il devient $\left(i, r_{1}, \ldots, r_{k}\right)$ si $\mathrm{top}\left(r_{c}\right)=0$ et $\left(j, r_{1}, \ldots, r_{k}\right) \mathrm{si} \mathrm{top}\left(r_{c}\right)=1$.
+
+\end{itemize}
+
+On fixe une valeur initiale pour les piles $r_{1}, \ldots, r_{k}$. Le compteur d'instruction $R$ vaut initialement 1 . On convient que lorsque $R=0$, la machine s'arrête. À chaque instant $t$, tant que $R \neq 0$, on regarde la valeur du compteur d'instruction $R$. On exécute alors l'instruction $I_{R}$ correspondante, qui met à jour $R$, et les valeurs des piles $r_{1}, \ldots, r_{k}$ selon les règles plus haut pour cette instruction $I_{R}$.
+
+\begin{question}
+	Montrer que toute machine de Turing peut être simulée par une machine à 2 piles.
+\end{question}
+
+\begin{question}
+	Prouver que pour toute machine de Turing, on peut construire un réseau de neurones linéaires saturés dont tous les coefficients sont rationnels qui la simule. On s'autorisera à ce que la simulation ne soit pas en temps réel ${ }^{5}$.
+\end{question}
+
+La réciproque est vraie : tout réseau de neurones linéaires saturés dont tous les coefficients sont rationnels peut être simulé par une machine de Turing. Cela découle de la thèse de ChurchTuring, ou peut se prouver en construisant explicitement un programme de machine de Turing adéquat.
+
+Les réseaux de neurones linéaires saturés dont les coefficients sont des rationnels sont donc essentiellement des machines de Turing, en terme de puissance de calcul.
+
+\begin{question}
+	Formaliser le problème de l'apprentissage exact d'un réseau de neurones linéaires saturés. Prouver que le problème est indécidable.
+\end{question}
+
+On remarquera que l'on cherche souvent dans le contexte des réseaux de neurones, et de l'apprentissage profond à apprendre un réseau de façon approchée, alors que ces résultats concernent
+
+\begin{enumerate}
+  \setcounter{enumi}{4}
+  \item Voir l'énoncé de la question 42. la question de l'apprentissage exact (dans le sens où on cherche un réscau qui correspond exactement aux crcmples).
+\end{enumerate}
+
+\begin{question}
+	Le problème de l'apprentissage exact reste-t-il indécidable si on fixe une architecture? Pour un réseau de neurones dont on fixe l'architecture ainsi que tous les poids et seuils, sauf un? Discuter ce que l'on obtient.
+\end{question}
+
+
+\end{document}
